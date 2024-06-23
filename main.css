@@ -1,0 +1,41 @@
+.shiny-plot-output {
+    margin-bottom: 50px;
+}
+
+.plotly {
+    margin-bottom: 100px;
+}
+
+#panel_toggle_buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+.step_desc {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.pad_top {
+  margin-top: 20px;
+}
+
+#palette_control {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-around;
+}
+
+#palette_control button {
+  width: 33%;
+}
+
+#palette {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  display: flex;
+  justify-content: stretch;
+}
