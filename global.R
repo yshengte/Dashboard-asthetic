@@ -13,6 +13,7 @@ library(leaflet)
 library(leaflet.minicharts)
 library(leaflet.extras)
 
+
 source("data_funcs.R")
 source("plot_funcs.R")
 source("ui_funcs.R")
@@ -28,7 +29,7 @@ create_ids <- function(items, prefix) {
 
 IDs <- list(
   Select = create_ids(c("rcoupon", "respID", "plot", "waves", "seeds",
-                        "prog", "resp", "chain",
+                        "prog", "resp_main","resp_aux", "chain",
                         "color", "demo_format",
                         #后为新添加
                         "cpt_font_family",
@@ -59,6 +60,8 @@ IDs <- list(
                         "rc_title_options_hidden_bottom",
                         "rc_plot_detail_options_hidden_bottom",
                         "rc_font_options_hidden_bottom",
+                        "cpt_download_buttom",
+                        "pc_download_buttom",
                         "rc_download_buttom"
                         ),
                       "button"),

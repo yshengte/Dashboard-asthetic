@@ -41,7 +41,9 @@ create_progress_tab <- function(
     font_options_hidden_bottom,
     font_family_id,
     font_title_face_id,
-    font_axis_face_id
+    font_axis_face_id,
+    #
+    download_buttom
 ) {
   tabPanel("Data Collection Progress",
     tags$div(class = "pad_top",
@@ -61,6 +63,9 @@ create_progress_tab <- function(
               label = "ADD",
               style = "position: relative; top: 23px;"
             )
+          ),
+          column(width = 3,
+                 downloadButton(download_buttom, "Download Image")
           )
           
         ),
@@ -215,7 +220,8 @@ create_progress_tab <- function(
 }
 
 create_respondent_tab <- function(
-    select_id,
+    select_main_id,
+    select_aux_id,
     textin_id,
     button_id,
     tabset_id,
@@ -233,7 +239,9 @@ create_respondent_tab <- function(
     font_options_hidden_id,
     font_options_hidden_bottom,
     font_family_id,
-    font_title_face_id
+    font_title_face_id,
+    #
+    download_buttom
 ) {
   tabPanel("Participant Characteristics",
     tags$div(class = "pad_top",
@@ -241,11 +249,19 @@ create_respondent_tab <- function(
         fluidRow(
         column(width = 3,
           selectInput(
-            inputId = select_id,
-            label = "Select factor",
+            inputId = select_main_id,
+            label = "Select main factor",
             choices = choices,
             width = "100%"
           )
+        ),
+        column(width = 3,
+               selectInput(
+                 inputId = select_aux_id,
+                 label = "Select auxillary factor (optional)",
+                 choices = c("", choices),
+                 width = "100%"
+               )
         ),
         column(width = 3,
           actionButton(
@@ -253,7 +269,11 @@ create_respondent_tab <- function(
             label = "ADD",
             style = "position: relative; top: 23px;"
           )
-        )),
+        ),
+        column(width = 3,
+               downloadButton(download_buttom, "Download Image")
+        )
+        ),
       fluidRow(
       tabsetPanel(id = tabset_id)),
       fluidRow(

@@ -147,6 +147,84 @@ collection_progress_plot <- function(df, plot_palette, download,
   return(p)
 }
 
+collection_progress_plot_down <- function(df, plot_palette, 
+                                     select_factor,
+                                     plot_title,
+                                     title_size,subtitle_size,
+                                     axisx_size,axisy_size,legend_text_size,
+                                     axisx_text_size,axisy_text_size,
+                                     font_family,
+                                     font_face_title,font_face_axis) {
+  plot_df <- df |>
+    filter(!is.na(FACTOR)) |>
+    group_by(FACTOR, WEEK) |>
+    summarize(
+      recruit = n(),
+      seed = sum(SEED, na.rm = TRUE),
+      coupon = sum(CT_T_CP_USED, na.rm = TRUE)
+    ) |>
+    mutate(
+      recruit = cumsum(recruit),
+      seed = cumsum(seed),
+      coupon = cumsum(coupon)
+    )
+  
+  plot_df <- plot_df |> pivot_longer(-c(WEEK, FACTOR), names_to = "type", values_to = "count")
+  
+  # 检查分类变量 'group' 有多少个不同的值
+  number_of_levels <- length(unique(plot_df$FACTOR))
+  
+  # 设置labeller函数
+  # 如果只有一个级别的 'group'，则不显示变量名，否则使用 label_both
+  custom_labeller <- function(variable_values){
+    setNames(paste(select_factor, variable_values, sep = ": "), variable_values)
+  }
+  if (number_of_levels > 1) {
+    # When there are multiple levels, use the custom labeller
+    labeller_function <- as_labeller(custom_labeller)
+  } else {
+    # When there is one or no level, do not show facets
+    labeller_function <- label_value
+  }
+  #if(number_of_levels > 1) label_both else label_value
+  plot_title_final <- if(plot_title == '') select_factor else plot_title
+  p <- plot_df |>
+    ggplot(
+      aes(x = WEEK, y = count)
+    ) +
+    geom_line(
+      aes(color = type),
+      linewidth = 0.8
+    ) +
+    facet_wrap(
+      vars(FACTOR),labeller = labeller_function#,labeller = label_both#,
+      #labeller = labeller(FACTOR = label_bquote(.(unique(FACTOR)) == .(value)))
+    ) +
+    scale_color_manual(
+      values = plot_palette
+    ) +
+    theme_bw() +
+    labs(
+      title = plot_title_final,
+      x = "Week in production", y = "Count"
+    ) +
+    theme(
+      panel.spacing.y = unit(2, "lines"),
+      plot.background = element_rect(fill='transparent'),
+      legend.position = "top",
+      legend.justification = "left",
+      strip.text = element_text(size = subtitle_size, family = font_family),
+      plot.title = element_text(hjust = 0.5, size = title_size,family = font_family, face = font_face_title,margin = margin(b = 100, unit = "lines")),  # 自定义标题样式
+      # 下面设置axis标题和legend的字体和大小
+      axis.title.x = element_text(size = axisx_size, family = font_family, face = font_face_axis),
+      axis.title.y = element_text(size = axisy_size, family = font_family, face = font_face_axis),
+      legend.text = element_text(size = legend_text_size, family = font_family),
+      axis.text.x = element_text(size = axisx_text_size, family = font_family, face = "bold"),
+      axis.text.y = element_text(size = axisy_text_size, family = font_family, face =  "italic")
+    )
+  
+  return(p)
+}
 # respondent_plot <- function(df, spec) {
 #   # df <- df |> filter(!is.na(FACTOR))
 #   
@@ -200,7 +278,8 @@ collection_progress_plot <- function(df, plot_palette, download,
 #   return(p)
 # }
 
-respondent_plot <- function(df, plot_palette, download,
+respondent_plot <- function(df, plot_palette, 
+                            download,
                             select_factor,
                             plot_title,bar_width,
                             title_size,legend_text_size,
@@ -213,8 +292,10 @@ respondent_plot <- function(df, plot_palette, download,
     mutate(FACTOR = factor(FACTOR, levels = c(setdiff(sort(unique(FACTOR)), "NA"), "NA"))) |>
     group_by(FACTOR) |>
     summarize(perc = n() / total)
+  
   #添加默认title
   plot_title_final <- if(plot_title == '') select_factor else plot_title
+  
   p <- ggplot(
     data = plot_df,
     aes(x = FACTOR, y = perc, fill = FACTOR)
@@ -256,6 +337,221 @@ respondent_plot <- function(df, plot_palette, download,
     )
   p <- p %>% layout(
     legend = list(x = 1, y = 1, xanchor = 'right', yanchor = 'top'),
+    font = list(family = font_family)
+  )
+  return(p)
+}
+
+respondent_plot_down <- function(df, plot_palette, 
+                            
+                            select_factor,
+                            plot_title,bar_width,
+                            title_size,legend_text_size,
+                            axisx_text_size,axisy_text_size,
+                            font_family,font_face_title) {
+  total <- nrow(df)
+  plot_df <- df |>
+    mutate(FACTOR = as.character(FACTOR)) %>%
+    replace(is.na(.), "NA") |>
+    mutate(FACTOR = factor(FACTOR, levels = c(setdiff(sort(unique(FACTOR)), "NA"), "NA"))) |>
+    group_by(FACTOR) |>
+    summarize(perc = n() / total)
+  #添加默认title
+  plot_title_final <- if(plot_title == '') select_factor else plot_title
+  p <- ggplot(
+    data = plot_df,
+    aes(x = FACTOR, y = perc, fill = FACTOR)
+  ) +
+    geom_bar(
+      stat = "identity",
+      position = "dodge",
+      width=bar_width,
+    ) +
+    
+    scale_fill_manual(
+      values = plot_palette
+    )  +
+    
+    scale_y_continuous(
+      labels = scales::percent
+    ) +
+    labs(x = "", y = "") +
+    theme(
+      text = element_text(size = 15),
+      plot.background = element_rect(fill='transparent'),
+      plot.title = element_text(hjust = 0.5, size = title_size,family = font_family, face = font_face_title),
+      axis.text.x = element_text(family = font_family, size = axisx_text_size),
+      axis.text.y = element_text(family = font_family, size = axisy_text_size),
+      legend.title = element_text(size = legend_text_size, family=font_family),
+      legend.text = element_text(size = legend_text_size, family=font_family),
+      #后添加
+      legend.position = c(1, 1),
+      legend.justification = c(1, 1),
+      legend.box.just = "top", 
+      legend.box.margin = margin(t = 10, r = 10, b = 0, l = 0, unit = "pt"),
+    )+
+    labs(title = plot_title_final, fill = select_factor)
+  return(p)
+}
+
+respondent_plot1 <- function(df, download,
+                             select_factor,
+                             plot_title,bar_width,
+                             title_size,legend_text_size,
+                             axisx_text_size,axisy_text_size,
+                             font_family,font_face_title) {
+  total <- nrow(df)
+  plot_df <- df |>
+    mutate(FACTOR = as.character(FACTOR)) %>%
+    replace(is.na(.), "NA") |>
+    mutate(FACTOR = factor(FACTOR, levels = c(setdiff(sort(unique(FACTOR)), "NA"), "NA"))) |>
+    group_by(FACTOR) |>
+    summarize(perc = n() / total)
+  
+  #添加默认title
+  plot_title_final <- if(plot_title == '') select_factor else plot_title
+  
+  p <- ggplot(
+    data = plot_df,
+    aes(x = FACTOR, y = perc)
+  ) +
+    geom_bar(
+      stat = "identity",
+      position = "dodge",
+      width = bar_width
+    ) +
+    scale_y_continuous(
+      labels = scales::percent
+    ) +
+    labs(x = "", y = "") +
+    theme(
+      text = element_text(size = 15),
+      plot.background = element_rect(fill='transparent'),
+      plot.title = element_text(hjust = 0.5, size = title_size,family = font_family, face = font_face_title),
+      axis.text.x = element_text(family = font_family, size = axisx_text_size),
+      axis.text.y = element_text(family = font_family, size = axisy_text_size),
+      legend.title = element_text(size = legend_text_size, family=font_family),
+      legend.text = element_text(size = legend_text_size, family=font_family)
+    )+
+    labs(title = plot_title_final, fill = select_factor)
+  
+  p <- ggplotly(p) |>
+    config(
+      modeBarButtons = list(list("toImage", "resetScale2d")),
+      toImageButtonOptions = list(
+        format = download$format,
+        width = download$width,
+        height = download$height,
+        scale = download$scale
+      )
+    )
+  
+  p <- p %>% layout(
+    legend = list(x = 1, y = 1, xanchor = 'right', yanchor = 'top'),
+    font = list(family = font_family)
+  )
+  
+  return(p)
+}
+
+respondent_plot2 <- function(df, plot_palete, download,
+                             select_factor,
+                             select_factor_aux,
+                             plot_title,bar_width,
+                             title_size,legend_text_size,
+                             axisx_text_size,axisy_text_size,
+                             font_family,font_face_title) {
+  df <- df |> mutate(
+    MAIN = as.character(MAIN),
+    AUX = as.character(AUX)
+  ) %>%
+    replace(is.na(.), "NA")
+  
+  by_both <- df |>
+    group_by(AUX, MAIN) |>
+    summarize(count = n()) |>
+    mutate(
+      prop = count / sum(count),
+      total_count = sum(count)
+    )
+  
+  by_main <- df |>
+    group_by(MAIN) |>
+    summarize(count = n()) |>
+    mutate(
+      prop = count / sum(count),
+      total_count = sum(count),
+      AUX = "Total"
+    )
+  
+  by_aux <- df |>
+    group_by(AUX) |>
+    summarize(count = n())
+  
+  plot_df <- rbind(by_both, by_main) |>
+    mutate(
+      MAIN = factor(MAIN, levels = c(setdiff(sort(unique(MAIN)), "NA"), "NA")),
+      AUX  = factor(AUX, levels = c("Total", setdiff(sort(unique(AUX)), c("Total", "NA")), "NA"))
+    )
+  
+  plot_title_final <- if(plot_title == '') paste(select_factor,select_factor_aux,sep="+") else plot_title
+  
+  
+  p <- ggplot(
+    plot_df,
+    aes(x = AUX, y = prop, fill = MAIN)
+  ) +
+    geom_bar(stat = "identity", position = "stack", width = bar_width) +
+    geom_text(
+      aes(label = sprintf("%1.1f%%", prop * 100)),
+      position = position_stack(vjust = 0.5),
+      size = 5,
+      hjust = 0.5
+    ) +
+    scale_y_continuous(
+      labels = scales::percent
+    ) +
+    scale_fill_manual(
+      values = plot_palete,
+      name = NULL
+    ) +
+    labs(x = "", y = "") +
+    theme(
+      text = element_text(size = 15),
+      plot.background = element_rect(fill='transparent'),
+      legend.background = element_rect(fill = "transparent"),
+      plot.title = element_text(hjust = 0.5, size = title_size,family = font_family, face = font_face_title),
+      axis.text.x = element_text(family = font_family, size = axisx_text_size),
+      axis.text.y = element_text(family = font_family, size = axisy_text_size),
+      legend.title = element_text(size = legend_text_size, family=font_family),
+      legend.text = element_text(size = legend_text_size, family=font_family)
+    )+
+    labs(title = plot_title_final, fill = select_factor_aux)
+  
+  for(i in 1:nrow(by_aux)) {
+    p <- p + annotate(
+      "text",
+      x = by_aux$AUX[i],
+      y = 1,
+      label = paste0("n=", by_aux$count[i]),
+      vjust = -0.5,
+      size = 5
+    )
+  }
+  
+  p <- ggplotly(p) |>
+    config(
+      modeBarButtons = list(list("toImage", "resetScale2d")),
+      toImageButtonOptions = list(
+        format = download$format,
+        width = download$width,
+        height = download$height,
+        scale = download$scale
+      )
+    )
+  p <- p %>% layout(
+    legend = list(#x = 1, y = 1, xanchor = 'right', yanchor = 'top',
+                  title=list(text = select_factor)),
     font = list(family = font_family)
   )
   return(p)

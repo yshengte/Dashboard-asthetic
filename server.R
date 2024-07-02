@@ -10,7 +10,12 @@ server <- function(input, output, session) {
   added_colors <- reactiveVal(color_settings$default)
   plot_palette <- reactiveVal(color_settings$default)
   #
-  tab_values <- reactiveValues(current_tab = NULL)
+  cpt_tab_values <- reactiveValues(current_tab = NULL)
+  cpt_tabs_data<-reactiveValues()
+  pc_tab_values <- reactiveValues(current_tab = NULL)
+  pc_tabs_data<-reactiveValues()
+  rc_tab_values <- reactiveValues(current_tab = NULL)
+  rc_tabs_data<-reactiveValues()
   
   observeEvent(input[[IDs$File$input]], {
     var2col(c())
@@ -156,11 +161,14 @@ server <- function(input, output, session) {
             IDs$Button$cpt_font_options_hidden_bottom,
             IDs$Select$cpt_font_family,
             IDs$Select$cpt_font_face_title,
-            IDs$Select$cpt_font_face_axis
+            IDs$Select$cpt_font_face_axis,
+            #
+            IDs$Button$cpt_download_buttom
           )
         } else if(input[[IDs$Select$plot]] == "Participant Characteristics") {
           tab <- create_respondent_tab(
-            IDs$Select$resp,
+            IDs$Select$resp_main,
+            IDs$Select$resp_aux,
             IDs$Keyboard$resp,
             IDs$Button$resp_add,
             IDs$Tabset$resp,
@@ -180,7 +188,9 @@ server <- function(input, output, session) {
             IDs$Other$pc_font_options_hidden_id,
             IDs$Button$pc_font_options_hidden_bottom,
             IDs$Select$pc_font_family,
-            IDs$Select$pc_font_face_title
+            IDs$Select$pc_font_face_title,
+            #
+            IDs$Button$pc_download_buttom
           )
         } else if(input[[IDs$Select$plot]] == "Recruitment Chains") {
           tab <- create_rchain_tab(
@@ -227,12 +237,16 @@ server <- function(input, output, session) {
     }
   })
   
+  
   # Data Collection Progress
   observeEvent(input[[IDs$Button$prog_add]], {
     plot_id <-  paste0("prog_plot_", isolate(plot_count()))
     kb <- isolate(input[[IDs$Keyboard$prog]])
     sl <- isolate(input[[IDs$Select$prog]])
     tab_title <- if(kb == '') sl else kb
+    
+    #储存tab_title和对应sl
+    cpt_tabs_data[[tab_title]] <- sl
     
     df <- isolate(data())
     df_cleaned <- isolate(cleaned_data())
@@ -281,7 +295,8 @@ server <- function(input, output, session) {
   output[[IDs$Plot$prog]] <- renderPlotly({
     isolate(data()) |>
       mutate(FACTOR = "") |>
-      collection_progress_plot(plot_palette(), list(
+      collection_progress_plot(plot_palette(), 
+      list(
         format = input[[IDs$Select$demo_format]],
         height = input[[IDs$Keyboard$demo_height]],
         width = input[[IDs$Keyboard$demo_width]],
@@ -304,14 +319,62 @@ server <- function(input, output, session) {
       )
       
   })
+  # 可以在控制台输出当前选中的tab
+  observe({
+    cpt_tab_values$current_tab <- input[[IDs$Tabset$prog]]  # 获取当前选中的tab名字
+  })   
   
+  #设置下载按钮的输出
+  output[[IDs$Button$cpt_download_buttom]]<-downloadHandler(
+    #设置文件名字
+    filename=paste(paste("Data_Collection_Progress",input[[IDs$Keyboard$prog]],sep="_"),"png",sep=".") ,
+    #设置文件内容      
+    content = function(file){
+      current_tab <- cpt_tab_values$current_tab
+      print(current_tab)
+      #sl_factor<-current_tab
+      if(current_tab=='Overall'){
+        isolated_data <- isolate(data())
+        prepared_data <-   isolated_data |> mutate(FACTOR = "")
+        
+        p<-collection_progress_plot_down(
+            prepared_data,
+            plot_palette(),
+            "Overall",
+            input[[IDs$Keyboard$prog]],
+            #后面为新添加
+            input[[IDs$Slider$cpt_t_size]],
+            input[[IDs$Slider$cpt_subt_size]],
+            input[[IDs$Slider$cpt_x_t_size]],
+            input[[IDs$Slider$cpt_y_t_size]],
+            input[[IDs$Slider$cpt_legend_text_size]],
+            input[[IDs$Slider$cpt_x_text_size]],
+            input[[IDs$Slider$cpt_y_text_size]],
+            input[[IDs$Select$cpt_font_family]],
+            input[[IDs$Select$cpt_font_face_title]],
+            input[[IDs$Select$cpt_font_face_axis]]
+          )
+        plot_width_ui <- 9.6 # 假定UI的宽度为10英寸
+        plot_height_ui <- 750 / 96 # 假定UI的高度设置为750像素, 96是转换因子
+        
+        # 使用ggsave保存图形，尺寸应该接近UI中的显示区域大小
+        ggsave(file, plot = p, width = plot_width_ui, height = plot_height_ui, units = "in", dpi = 96,bg = "white")
+      }else{
+        df <- isolate(data())
+        df_cleaned <- isolate(cleaned_data())
+        #通过tab_title获得factor
+        sl_factor <- cpt_tabs_data[[current_tab]]
+        print(sl_factor)
+        
+      }
+    }
+  )
   observeEvent(input[[IDs$Button$cpt_title_options_hidden_bottom]], {
     shinyjs::toggle(id = IDs$Other$cpt_title_options_hidden_id)  # Toggle the visibility of the font options
   })
   observeEvent(input[[IDs$Button$cpt_plot_detail_options_hidden_bottom]], {
     shinyjs::toggle(id = IDs$Other$cpt_plot_detail_options_hidden_id)  # Toggle the visibility of the font options
   })
-  #shinyjs::hide(id = IDs$Other$cpt_font_options_id)
   observeEvent(input[[IDs$Button$cpt_font_options_hidden_bottom]], {
       shinyjs::toggle(id = IDs$Other$cpt_font_options_hidden_id)  # Toggle the visibility of the font options
   })
@@ -321,35 +384,118 @@ server <- function(input, output, session) {
   observeEvent(input[[IDs$Button$resp_add]], {
     plot_id <-  paste0("resp_plot_", isolate(plot_count()))
     kb <- isolate(input[[IDs$Keyboard$resp]])
-    sl <- isolate(input[[IDs$Select$resp]])
-    tab_title <- if(kb == '') sl else kb
+    sl1 <- isolate(input[[IDs$Select$resp_main]])
+    sl2 <- isolate(input[[IDs$Select$resp_aux]])
+    tab_title <- if(kb == '') sl1 else kb
+    #储存tab_title和对应sl
+    pc_tabs_data[[tab_title]] <- sl1
     
     df <- isolate(data())
     df_cleaned <- isolate(cleaned_data())
+    max_level_count <- 10
     
-    if(n_distinct(df_cleaned[[sl]]) > length(plot_palette())) {
-      show_alert("The number of unique values exceeds the number of colors in the selected palette.", session)
-    } else {
-      appendTab(
-        inputId = IDs$Tabset$resp,
-        select = TRUE,
-        tabPanel(tab_title,
-          tags$div(class = "pad_top",
-            plotlyOutput(outputId = plot_id, height = 750)
+    if(sl2 == "") {
+      if(n_distinct(df_cleaned[[sl1]]) > max_level_count) {
+        show_alert("The selected columns contain too many unique values.", session)
+      } else {
+        appendTab(
+          inputId = IDs$Tabset$resp,
+          select = TRUE,
+          tabPanel(tab_title,
+                   tags$div(class = "pad_top",
+                            plotlyOutput(outputId = plot_id, height = 750)
+                   )
           )
         )
-      )
-      
-      output[[plot_id]] <- renderPlotly({
-        df |>
-          mutate(FACTOR = df_cleaned[[sl]]) |>
-          respondent_plot(plot_palette(),list(
-            format = input[[IDs$Select$demo_format]],
-            height = input[[IDs$Keyboard$demo_height]],
-            width = input[[IDs$Keyboard$demo_width]],
-            scale = input[[IDs$Keyboard$demo_scale]]
-          ),
-          sl,
+        
+        output[[plot_id]] <- renderPlotly({
+          df |>
+            mutate(FACTOR = df_cleaned[[sl1]]) |>
+            respondent_plot1(list(
+              format = input[[IDs$Select$demo_format]],
+              height = input[[IDs$Keyboard$demo_height]],
+              width = input[[IDs$Keyboard$demo_width]],
+              scale = input[[IDs$Keyboard$demo_scale]]
+            ),sl1,
+            input[[IDs$Keyboard$resp]],
+            #以下为新添加
+            input[[IDs$Slider$pc_bar_width]],
+            input[[IDs$Slider$pc_title_size]],
+            input[[IDs$Slider$pc_legend_text_size]],
+            input[[IDs$Slider$pc_x_axis_text_size]],
+            input[[IDs$Slider$pc_y_axis_text_size]],
+            input[[IDs$Select$pc_font_family]],
+            input[[IDs$Select$pc_font_face_title]]
+            )
+        })
+        
+        plot_count(plot_count() + 1) 
+      }
+    } else {
+      if(n_distinct(df_cleaned[[sl2]]) > max_level_count | n_distinct(df_cleaned[[sl1]]) > length(plot_palette())) {
+        show_alert("The selected columns contain too many unique values.", session)
+      } else {
+        appendTab(
+          inputId = IDs$Tabset$resp,
+          select = TRUE,
+          tabPanel(tab_title,
+                   tags$div(class = "pad_top",
+                            plotlyOutput(outputId = plot_id, height = 750)
+                   )
+          )
+        )
+        
+        output[[plot_id]] <- renderPlotly({
+          df |>
+            mutate(
+              MAIN = df_cleaned[[sl1]],
+              AUX = df_cleaned[[sl2]]
+            ) |>
+            respondent_plot2(plot_palette(), list(
+              format = input[[IDs$Select$demo_format]],
+              height = input[[IDs$Keyboard$demo_height]],
+              width = input[[IDs$Keyboard$demo_width]],
+              scale = input[[IDs$Keyboard$demo_scale]]
+            ),sl1,sl2,
+            input[[IDs$Keyboard$resp]],
+            #以下为新添加
+            input[[IDs$Slider$pc_bar_width]],
+            input[[IDs$Slider$pc_title_size]],
+            input[[IDs$Slider$pc_legend_text_size]],
+            input[[IDs$Slider$pc_x_axis_text_size]],
+            input[[IDs$Slider$pc_y_axis_text_size]],
+            input[[IDs$Select$pc_font_family]],
+            input[[IDs$Select$pc_font_face_title]])
+        })
+        
+        plot_count(plot_count() + 1) 
+      }
+    }
+  })
+  
+  # 可以在控制台输出当前选中的tab
+  observe({
+    pc_tab_values$current_tab <- input[[IDs$Tabset$resp]]  # 获取当前选中的tab名字
+  })   
+  
+  #设置下载按钮的输出
+  output[[IDs$Button$pc_download_buttom]]<-downloadHandler(
+    #设置文件名字
+    filename=paste(paste("Participant_Characteristics",input[[IDs$Keyboard$resp]],sep="_"),"png",sep=".") ,
+    #设置文件内容      
+    content = function(file){
+      current_tab <- pc_tab_values$current_tab
+        
+        df <- isolate(data())
+        df_cleaned <- isolate(cleaned_data())
+        #通过tab_title获得factor
+        sl_factor <- pc_tabs_data[[current_tab]]
+        
+        #png(file)
+        p<-df |>
+          mutate(FACTOR = df_cleaned[[sl_factor]]) |>
+          respondent_plot_down(plot_palette(),
+          sl_factor,
           input[[IDs$Keyboard$resp]],
           #以下为新添加
           input[[IDs$Slider$pc_bar_width]],
@@ -360,27 +506,32 @@ server <- function(input, output, session) {
           input[[IDs$Select$pc_font_family]],
           input[[IDs$Select$pc_font_face_title]]
           )
-      })
-      
-      plot_count(plot_count() + 1) 
+        #dev.off()
+        #ggsave(file, plot = p, device = "png")
+        #plotly::to_image(p, file = file, format = "png")
+        # 获取UI显示的宽度值，这可能需要您手动调整或从UI设计中获取
+        plot_width_ui <- 9.6 # 假定UI的宽度为10英寸
+        plot_height_ui <- 750 / 96 # 假定UI的高度设置为750像素, 96是转换因子
+        
+        # 使用ggsave保存图形，尺寸应该接近UI中的显示区域大小
+        ggsave(file, plot = p, width = plot_width_ui, height = plot_height_ui, units = "in", dpi = 96,bg = "white")
     }
-  })
+  )
+  
     observeEvent(input[[IDs$Button$pc_title_options_hidden_bottom]], {
       shinyjs::toggle(id = IDs$Other$pc_title_options_hidden_id)  # Toggle the visibility of the font options
     })
     observeEvent(input[[IDs$Button$pc_plot_detail_options_hidden_bottom]], {
       shinyjs::toggle(id = IDs$Other$pc_plot_detail_options_hidden_id)  # Toggle the visibility of the font options
     })
-    #shinyjs::hide(id = IDs$Other$cpt_font_options_id)
     observeEvent(input[[IDs$Button$pc_font_options_hidden_bottom]], {
       shinyjs::toggle(id = IDs$Other$pc_font_options_hidden_id)  # Toggle the visibility of the font options
     })  
-    
-    
-  # Recruitment Chains  
-    # 观察用户切换tab
    
 
+    
+   
+#Recruitment chain
   output[[IDs$Plot$chain]] <- renderPlot({
     isolate(data()) |>
       mutate(FACTOR = "") |>
@@ -391,12 +542,16 @@ server <- function(input, output, session) {
                               input[[IDs$Select$rc_font_family]])
   })
   
+  
   observeEvent(input[[IDs$Button$chain_add]], {
     plot_id <-  paste0("chain_plot_", isolate(plot_count())) 
     kb <- isolate(input[[IDs$Keyboard$chain]])
     sl <- isolate(input[[IDs$Select$chain]])
     tab_title <- if(kb == '') sl else kb
+    #储存tab_title和对应sl
+    rc_tabs_data[[tab_title]] <- sl
     
+    #print(tabs_data[[tab_title]]$factor)
     df <- isolate(data())
     df_cleaned <- isolate(cleaned_data())
     
@@ -407,7 +562,10 @@ server <- function(input, output, session) {
         inputId = IDs$Tabset$chain,
         select = TRUE,
         tabPanel(tab_title,
-          plotOutput(outputId = plot_id, height = 750),
+                 div(plotOutput(outputId = plot_id, height = 750),
+                     #添加隐藏的plot_id显示
+                     hidden(textInput(inputId = plot_id, label = NULL, value = plot_id)))
+                
         )
       )
       
@@ -426,31 +584,22 @@ server <- function(input, output, session) {
     }
     
   })
-  
 
+# 可以在控制台输出当前选中的tab
     observe({
-      tab_values$current_tab <- input[[IDs$Tabset$chain]]  # 获取当前选中的tab名字
-      print(tab_values$current_tab)  # 可以在控制台输出当前选中的tab
+      rc_tab_values$current_tab <- input[[IDs$Tabset$chain]]  # 获取当前选中的tab名字
+      print(input[[IDs$Tabset$chain]])
+
     })   
 
+#设置下载按钮的输出
   output[[IDs$Button$rc_download_buttom]]<-downloadHandler(
-    #Specify the file name
-    if(input[[IDs$Keyboard$chain]]==''){
-        paste(paste("recruitment_chain",input[[IDs$Keyboard$chain]],sep="_"),"png",sep=".")
-      }else{
-        paste(paste("recruitment_chain",input[[IDs$Keyboard$chain]],sep="_"),"png",sep=".")
-      },
+    #设置文件名字
+    filename=paste(paste("recruitment_chain",input[[IDs$Keyboard$chain]],sep="_"),"png",sep=".") ,
+    #设置文件内容      
     content = function(file){
-      # 当前活跃Tab的名称
-      # 根据Tab名称找到对应的plot ID
-#      plot_id <- names(plots_tab_mapping)[plots_tab_mapping == current_tab_name]
-#      req(plot_id)  # 确定找到了对应的plot ID
-      
-#      png(file)
-#      print(output[["chain_plot_1"]]())
-#      dev.off()
-      current_tab <- tab_values$current_tab
-      sl<-current_tab
+      current_tab <- rc_tab_values$current_tab
+      #sl_factor<-current_tab
       if(current_tab=='Seed'){
         png(file)
         isolate(data()) |>
@@ -463,13 +612,17 @@ server <- function(input, output, session) {
 
         dev.off()
       }else{
-        png(file)
-        print(current_tab)
+
+        df <- isolate(data())
+        df_cleaned <- isolate(cleaned_data())
+       #通过tab_title获得factor
+        sl_factor <- rc_tabs_data[[current_tab]]
         
-        print(sl)
-        df |>
-          mutate(FACTOR = df_cleaned[[sl]]) |>
-          recruitment_chain_graph(plot_palette(),sl,
+        
+        png(file)
+        df|>
+          mutate(FACTOR = df_cleaned[[sl_factor]]) |>
+          recruitment_chain_graph(plot_palette(),sl_factor,
                                   input[[IDs$Keyboard$chain]],
                                   input[[IDs$Select$rc_layout_method]],
                                   input[[IDs$Slider$rc_title_size]],
@@ -478,6 +631,7 @@ server <- function(input, output, session) {
       }
     }
     )
+      
   observeEvent(input[[IDs$Button$rc_title_options_hidden_bottom]], {
     shinyjs::toggle(id = IDs$Other$rc_title_options_hidden_id)  # Toggle the visibility of the font options
   })
